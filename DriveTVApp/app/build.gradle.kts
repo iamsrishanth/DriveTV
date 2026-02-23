@@ -58,10 +58,8 @@ dependencies {
     implementation(libs.androidx.tv.foundation)
     implementation(libs.androidx.tv.material)
 
-    // Media3 (ExoPlayer)
-    implementation(libs.androidx.media3.exoplayer)
-    implementation(libs.androidx.media3.ui)
-    implementation(libs.androidx.media3.datasource.okhttp)
+    // LibVLC
+    implementation(libs.videolan.libvlc)
 
     // Networking
     implementation(libs.okhttp)

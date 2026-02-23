@@ -1,93 +1,80 @@
 package com.example.drivetvapp.player
 
 import android.content.Context
-import androidx.annotation.OptIn
-import androidx.media3.common.MediaItem
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DataSource
-import androidx.media3.datasource.cache.CacheDataSource
-import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
-import androidx.media3.datasource.cache.SimpleCache
-import androidx.media3.datasource.okhttp.OkHttpDataSource
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
-import okhttp3.OkHttpClient
-import java.io.File
+import android.net.Uri
+import org.videolan.libvlc.LibVLC
+import org.videolan.libvlc.Media
+import org.videolan.libvlc.MediaPlayer
 
-@OptIn(UnstableApi::class)
 class PlayerManager(private val context: Context) {
 
-    private var player: ExoPlayer? = null
-    private var cache: SimpleCache? = null
+    var libVLC: LibVLC? = null
+        private set
+    var mediaPlayer: MediaPlayer? = null
+        private set
 
-    fun getPlayer(accessToken: String): ExoPlayer {
-        if (player != null) return player!!
+    fun initialize() {
+        if (libVLC != null) return
 
-        val cacheDir = File(context.cacheDir, "exoplayer_cache")
-        val cacheEvictor = LeastRecentlyUsedCacheEvictor(1_000_000_000L) // 1GB disk cache
-        cache = SimpleCache(cacheDir, cacheEvictor)
+        val args = ArrayList<String>()
+        args.add("-vvv")
+        args.add("--drop-late-frames")
+        args.add("--skip-frames")
+        args.add("--rtsp-tcp")
+        args.add("--network-caching=3000") // 3 second buffer for streaming
 
-        val okHttpClient = OkHttpClient.Builder()
-            .addInterceptor { chain ->
-                val original = chain.request()
-                val authorized = original.newBuilder()
-                    .addHeader("Authorization", "Bearer $accessToken")
-                    .build()
-                chain.proceed(authorized)
-            }
-            .build()
-
-        val upstreamFactory = OkHttpDataSource.Factory(okHttpClient)
-
-        val cacheDataSourceFactory: DataSource.Factory = CacheDataSource.Factory()
-            .setCache(cache!!)
-            .setUpstreamDataSourceFactory(upstreamFactory)
-            .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
-
-        val mediaSourceFactory = DefaultMediaSourceFactory(cacheDataSourceFactory)
-
-        player = ExoPlayer.Builder(context)
-            .setMediaSourceFactory(mediaSourceFactory)
-            .build()
-
-        return player!!
+        libVLC = LibVLC(context, args)
+        mediaPlayer = MediaPlayer(libVLC)
     }
 
-    fun playUrl(url: String, subtitleUrls: List<String> = emptyList()) {
-        player?.let {
-            val mediaItemBuilder = MediaItem.Builder().setUri(url)
-            
-            val subtitleConfigs = subtitleUrls.mapIndexed { index, subtitleUrl ->
-                val mimeType = if (subtitleUrl.contains(".vtt", ignoreCase = true)) {
-                    androidx.media3.common.MimeTypes.TEXT_VTT
-                } else {
-                    androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
-                }
-                
-                // Only the first subtitle should be on by default. The rest should just be available in the menu.
-                val selectionFlag = if (index == 0) androidx.media3.common.C.SELECTION_FLAG_DEFAULT else 0
-                
-                MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(subtitleUrl))
-                    .setMimeType(mimeType)
-                    .setLanguage("en")
-                    .setSelectionFlags(selectionFlag)
-                    .build()
-            }
-            
-            if (subtitleConfigs.isNotEmpty()) {
-                mediaItemBuilder.setSubtitleConfigurations(subtitleConfigs)
-            }
-            
-            it.setMediaItem(mediaItemBuilder.build())
-            it.prepare()
-            it.playWhenReady = true
+    fun playUrl(url: String, accessToken: String, subtitleUrls: List<String> = emptyList()) {
+        val vlc = libVLC ?: return
+        val player = mediaPlayer ?: return
+
+        // Stop current play if any
+        player.stop()
+
+        // Append access token to the URL so VLC can bypass needing HTTP Authorization headers
+        // Google Drive API accepts access_token as a query param.
+        val authenticatedUrl = if (url.contains("?")) {
+            "$url&access_token=$accessToken"
+        } else {
+            "$url?access_token=$accessToken"
         }
+
+        val media = Media(vlc, Uri.parse(authenticatedUrl))
+
+        // Add subtitles
+        // Priority 4 is typical for subtitle tracks in LibVLC slave loading
+        subtitleUrls.forEachIndexed { index, subtitleUrl ->
+            val authedSubtitleUrl = if (subtitleUrl.contains("?")) {
+                "$subtitleUrl&access_token=$accessToken"
+            } else {
+                "$subtitleUrl?access_token=$accessToken"
+            }
+            media.addSlave(org.videolan.libvlc.interfaces.IMedia.Slave(org.videolan.libvlc.interfaces.IMedia.Slave.Type.Subtitle, 4, authedSubtitleUrl))
+        }
+
+        player.media = media
+        media.release() // MediaPlayer takes ownership
+
+        player.play()
+    }
+
+    fun getSubtitleTracks(): Array<MediaPlayer.TrackDescription> {
+        return mediaPlayer?.spuTracks ?: emptyArray()
+    }
+
+    fun setSubtitleTrack(trackId: Int) {
+        mediaPlayer?.spuTrack = trackId
     }
 
     fun release() {
-        player?.release()
-        player = null
-        cache?.release()
-        cache = null
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+        mediaPlayer = null
+        
+        libVLC?.release()
+        libVLC = null
     }
 }
