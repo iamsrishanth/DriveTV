@@ -57,17 +57,20 @@ class PlayerManager(private val context: Context) {
         player?.let {
             val mediaItemBuilder = MediaItem.Builder().setUri(url)
             
-            val subtitleConfigs = subtitleUrls.map { subtitleUrl ->
+            val subtitleConfigs = subtitleUrls.mapIndexed { index, subtitleUrl ->
                 val mimeType = if (subtitleUrl.contains(".vtt", ignoreCase = true)) {
                     androidx.media3.common.MimeTypes.TEXT_VTT
                 } else {
                     androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
                 }
                 
+                // Only the first subtitle should be on by default. The rest should just be available in the menu.
+                val selectionFlag = if (index == 0) androidx.media3.common.C.SELECTION_FLAG_DEFAULT else 0
+                
                 MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(subtitleUrl))
                     .setMimeType(mimeType)
                     .setLanguage("en")
-                    .setSelectionFlags(androidx.media3.common.C.SELECTION_FLAG_DEFAULT)
+                    .setSelectionFlags(selectionFlag)
                     .build()
             }
             

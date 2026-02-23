@@ -53,10 +53,31 @@ fun PlayerScreen(
                     useController = true
                     controllerAutoShow = true
                     controllerShowTimeoutMs = 5000
+                    setShowSubtitleButton(true)
                     
                     isFocusable = true
                     isFocusableInTouchMode = true
                     requestFocus()
+
+                    setOnKeyListener { _, keyCode, event ->
+                        if (event.action == android.view.KeyEvent.ACTION_DOWN) {
+                            val isDpadOrEnter = keyCode in listOf(
+                                android.view.KeyEvent.KEYCODE_DPAD_CENTER,
+                                android.view.KeyEvent.KEYCODE_DPAD_UP,
+                                android.view.KeyEvent.KEYCODE_DPAD_DOWN,
+                                android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+                                android.view.KeyEvent.KEYCODE_DPAD_RIGHT,
+                                android.view.KeyEvent.KEYCODE_ENTER,
+                                android.view.KeyEvent.KEYCODE_NUMPAD_ENTER
+                            )
+                            
+                            if (isDpadOrEnter && !isControllerFullyVisible) {
+                                showController()
+                                return@setOnKeyListener true // Wake up UI without triggering background actions
+                            }
+                        }
+                        false // Pass event to ExoPlayer or standard Android TV focus handler
+                    }
 
                     subtitleView?.setStyle(
                         CaptionStyleCompat(
