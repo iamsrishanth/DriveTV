@@ -24,6 +24,29 @@ class DriveRepository(private val auth: ServiceAccountAuth) {
 
     suspend fun listFiles(folderId: String = "root"): List<DriveFile> = withContext(Dispatchers.IO) {
         val accessToken = auth.getAccessToken()
+        val allFiles = mutableListOf<DriveFile>()
+        var pageToken: String? = null
+        var pageCount = 0
+        val maxPages = 5 // max 250 files
+
+        do {
+            pageCount++
+            val files = fetchPage(accessToken, folderId, pageToken)
+            allFiles.addAll(files)
+            pageToken = nextPageToken
+            // nextPageToken is set by fetchPage as a side effect — we read it from the class-level response
+        } while (pageToken != null && pageCount < maxPages)
+
+        allFiles
+    }
+
+    private var nextPageToken: String? = null
+
+    private suspend fun fetchPage(
+        accessToken: String,
+        folderId: String,
+        pageToken: String?
+    ): List<DriveFile> = withContext(Dispatchers.IO) {
 
         val query = if (folderId == "root") {
             "sharedWithMe = true and trashed = false"
@@ -32,11 +55,16 @@ class DriveRepository(private val auth: ServiceAccountAuth) {
         }
         val fields = "nextPageToken,files(id,name,mimeType,size,thumbnailLink)"
 
-        val url = "https://www.googleapis.com/drive/v3/files" +
-                "?q=${java.net.URLEncoder.encode(query, "UTF-8")}" +
-                "&fields=${java.net.URLEncoder.encode(fields, "UTF-8")}" +
-                "&orderBy=name" +
-                "&pageSize=50"
+        val url = buildString {
+            append("https://www.googleapis.com/drive/v3/files")
+            append("?q=${java.net.URLEncoder.encode(query, "UTF-8")}")
+            append("&fields=${java.net.URLEncoder.encode(fields, "UTF-8")}")
+            append("&orderBy=name")
+            append("&pageSize=50")
+            if (pageToken != null) {
+                append("&pageToken=${java.net.URLEncoder.encode(pageToken, "UTF-8")}")
+            }
+        }
 
         val request = Request.Builder()
             .url(url)
@@ -51,6 +79,8 @@ class DriveRepository(private val auth: ServiceAccountAuth) {
             val errorMsg = json.getJSONObject("error").optString("message", responseBody)
             throw Exception("Drive API error: $errorMsg")
         }
+
+        nextPageToken = if (json.has("nextPageToken")) json.getString("nextPageToken") else null
 
         val filesArray = json.optJSONArray("files") ?: return@withContext emptyList()
         val files = mutableListOf<DriveFile>()
