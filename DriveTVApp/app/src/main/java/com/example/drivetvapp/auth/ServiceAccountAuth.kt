@@ -13,10 +13,17 @@ import org.json.JSONObject
 import java.security.KeyFactory
 import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
+import java.util.concurrent.TimeUnit
 
 class ServiceAccountAuth(context: Context) {
 
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(60, TimeUnit.SECONDS)
+        .build()
+
     private val mutex = Mutex()
 
     private var cachedToken: String? = null
@@ -27,9 +34,14 @@ class ServiceAccountAuth(context: Context) {
     private val tokenUri: String
 
     init {
-        val raw = context.resources.openRawResource(
-            context.resources.getIdentifier("credentials", "raw", context.packageName)
-        )
+        val resId = context.resources.getIdentifier("credentials", "raw", context.packageName)
+        if (resId == 0) {
+            throw IllegalStateException(
+                "credentials.json not found in res/raw/. " +
+                "Place your service account key at app/src/main/res/raw/credentials.json"
+            )
+        }
+        val raw = context.resources.openRawResource(resId)
         val json = JSONObject(raw.bufferedReader().use { it.readText() })
         clientEmail = json.getString("client_email")
         privateKeyPem = json.getString("private_key")
@@ -83,22 +95,27 @@ class ServiceAccountAuth(context: Context) {
             .build()
 
         val response = client.newCall(request).execute()
-        val responseBody = response.body!!.string()
-        val json = JSONObject(responseBody)
+        response.use { resp ->
+            if (!resp.isSuccessful) {
+                throw Exception("Token exchange failed: HTTP ${resp.code} ${resp.message}")
+            }
+            val respBody = resp.body ?: throw Exception("Token exchange returned empty body")
+            val responseBody = respBody.string()
+            val json = JSONObject(responseBody)
 
-        if (json.has("error")) {
-            throw Exception("Token exchange failed: ${json.optString("error_description", responseBody)}")
+            if (json.has("error")) {
+                throw Exception("Token exchange failed: ${json.optString("error_description", responseBody)}")
+            }
+
+            val token = json.getString("access_token")
+            val expiresIn = json.optLong("expires_in", 3600L)
+            return token to expiresIn
         }
-
-        val token = json.getString("access_token")
-        val expiresIn = json.optLong("expires_in", 3600L)
-        return token to expiresIn
     }
 
     private fun signRsa256(data: ByteArray, pemKey: String): ByteArray {
         val stripped = pemKey
-            .replace("-----BEGIN PRIVATE KEY-----", "")
-            .replace("-----END PRIVATE KEY-----", "")
+            .replace("[REDACTED PRIVATE KEY]", "")
             .replace("\\n", "")
             .replace("\n", "")
             .trim()

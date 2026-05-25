@@ -6,10 +6,16 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 class DriveRepository(private val auth: ServiceAccountAuth) {
 
-    private val client = OkHttpClient()
+    private val client = OkHttpClient.Builder()
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(30, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
+        .callTimeout(60, TimeUnit.SECONDS)
+        .build()
 
     private val videoMimeTypes = setOf(
         "video/mp4", "video/x-matroska", "video/webm",
@@ -34,7 +40,6 @@ class DriveRepository(private val auth: ServiceAccountAuth) {
             val files = fetchPage(accessToken, folderId, pageToken)
             allFiles.addAll(files)
             pageToken = nextPageToken
-            // nextPageToken is set by fetchPage as a side effect — we read it from the class-level response
         } while (pageToken != null && pageCount < maxPages)
 
         allFiles
@@ -72,40 +77,46 @@ class DriveRepository(private val auth: ServiceAccountAuth) {
             .build()
 
         val response = client.newCall(request).execute()
-        val responseBody = response.body!!.string()
-        val json = JSONObject(responseBody)
-
-        if (json.has("error")) {
-            val errorMsg = json.getJSONObject("error").optString("message", responseBody)
-            throw Exception("Drive API error: $errorMsg")
-        }
-
-        nextPageToken = if (json.has("nextPageToken")) json.getString("nextPageToken") else null
-
-        val filesArray = json.optJSONArray("files") ?: return@withContext emptyList()
-        val files = mutableListOf<DriveFile>()
-
-        for (i in 0 until filesArray.length()) {
-            val fileJson = filesArray.getJSONObject(i)
-            val mimeType = fileJson.optString("mimeType", "")
-            val isFolder = mimeType == "application/vnd.google-apps.folder"
-            val isSubtitle = subtitleMimeTypes.contains(mimeType) || fileJson.optString("name").run { endsWith(".srt", true) || endsWith(".vtt", true) }
-
-            if (isFolder || videoMimeTypes.contains(mimeType) || isSubtitle) {
-                files.add(
-                    DriveFile(
-                        id = fileJson.getString("id"),
-                        name = fileJson.optString("name", "Unknown"),
-                        mimeType = mimeType,
-                        size = fileJson.optString("size", "0").toLongOrNull() ?: 0,
-                        thumbnailLink = fileJson.optString("thumbnailLink", null),
-                        isFolder = isFolder,
-                        isSubtitle = isSubtitle
-                    )
-                )
+        response.use { resp ->
+            if (!resp.isSuccessful) {
+                throw Exception("Drive API returned HTTP ${resp.code}: ${resp.message}")
             }
+            val body = resp.body ?: throw Exception("Drive API returned empty body")
+            val responseBody = body.string()
+            val json = JSONObject(responseBody)
+
+            if (json.has("error")) {
+                val errorMsg = json.getJSONObject("error").optString("message", responseBody)
+                throw Exception("Drive API error: $errorMsg")
+            }
+
+            nextPageToken = if (json.has("nextPageToken")) json.getString("nextPageToken") else null
+
+            val filesArray = json.optJSONArray("files") ?: return@withContext emptyList()
+            val files = mutableListOf<DriveFile>()
+
+            for (i in 0 until filesArray.length()) {
+                val fileJson = filesArray.getJSONObject(i)
+                val mimeType = fileJson.optString("mimeType", "")
+                val isFolder = mimeType == "application/vnd.google-apps.folder"
+                val isSubtitle = subtitleMimeTypes.contains(mimeType) || fileJson.optString("name").run { endsWith(".srt", true) || endsWith(".vtt", true) }
+
+                if (isFolder || videoMimeTypes.contains(mimeType) || isSubtitle) {
+                    files.add(
+                        DriveFile(
+                            id = fileJson.getString("id"),
+                            name = fileJson.optString("name", "Unknown"),
+                            mimeType = mimeType,
+                            size = fileJson.optString("size", "0").toLongOrNull() ?: 0,
+                            thumbnailLink = fileJson.optString("thumbnailLink", null),
+                            isFolder = isFolder,
+                            isSubtitle = isSubtitle
+                        )
+                    )
+                }
+            }
+            files
         }
-        files
     }
 
     fun getStreamUrl(fileId: String): String {
