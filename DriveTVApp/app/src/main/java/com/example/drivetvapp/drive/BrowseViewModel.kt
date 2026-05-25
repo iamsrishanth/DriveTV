@@ -61,9 +61,36 @@ class BrowseViewModel(private val driveRepository: DriveRepository) : ViewModel(
     fun getSubtitleUrls(fileId: String): List<Pair<String, String>> {
         val currentState = _browseState.value as? BrowseState.FileList ?: return emptyList()
         val videoFile = currentState.files.find { it.id == fileId } ?: return emptyList()
+        val videoBaseName = videoFile.nameWithoutExtension.lowercase()
         
         return currentState.files
-            .filter { it.isSubtitle && it.nameWithoutExtension.contains(videoFile.nameWithoutExtension, ignoreCase = true) }
+            .filter { file ->
+                if (!file.isSubtitle) return@filter false
+                val subBaseName = stripLanguageSuffix(file.nameWithoutExtension).lowercase()
+                subBaseName == videoBaseName
+            }
             .map { driveRepository.getStreamUrl(it.id) to it.name }
+    }
+
+    /**
+     * Strips common language codes from subtitle filenames.
+     * e.g., "Movie.en" → "Movie", "Movie.eng" → "Movie"
+     */
+    private fun stripLanguageSuffix(nameWithoutExt: String): String {
+        val langCodes = setOf(
+            "en", "eng", "fr", "fre", "es", "spa", "de", "ger", "ja", "jpn",
+            "ko", "kor", "zh", "chi", "pt", "por", "it", "ita", "ru", "rus",
+            "ar", "ara", "hi", "hin", "nl", "dut", "sv", "swe", "pl", "pol",
+            "tr", "tur", "cs", "cze", "ro", "rum", "hu", "hun", "fi", "fin",
+            "no", "nor", "da", "dan", "th", "tha", "vi", "vie"
+        )
+        val lastDot = nameWithoutExt.lastIndexOf('.')
+        if (lastDot > 0) {
+            val suffix = nameWithoutExt.substring(lastDot + 1).lowercase()
+            if (suffix in langCodes) {
+                return nameWithoutExt.substring(0, lastDot)
+            }
+        }
+        return nameWithoutExt
     }
 }
