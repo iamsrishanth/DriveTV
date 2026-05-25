@@ -65,18 +65,12 @@ dependencies {
 
     // Networking
     implementation(libs.okhttp)
-    implementation(libs.retrofit)
-    implementation(libs.retrofit.moshi)
-    implementation(libs.moshi)
 
     // Image loading
     implementation(libs.coil.compose)
 
     // Navigation
     implementation(libs.navigation.compose)
-
-    // Security
-    implementation(libs.security.crypto)
 
     // Coroutines
     implementation(libs.coroutines.android)

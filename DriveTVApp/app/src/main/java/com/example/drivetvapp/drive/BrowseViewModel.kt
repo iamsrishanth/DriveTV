@@ -26,7 +26,7 @@ class BrowseViewModel(private val driveRepository: DriveRepository) : ViewModel(
         loadFiles()
     }
 
-    fun loadFiles(folderId: String = "root", folderName: String = "My Drive") {
+    fun loadFiles(folderId: String = "root", folderName: String = "DriveTV") {
         _browseState.value = BrowseState.Loading
 
         viewModelScope.launch {
