@@ -43,9 +43,9 @@ class ServiceAccountAuth(context: Context) {
         }
         return withContext(Dispatchers.IO) {
             val jwt = createSignedJwt()
-            val token = exchangeJwtForToken(jwt)
+            val (token, expiresIn) = exchangeJwtForToken(jwt)
             cachedToken = token
-            tokenExpiresAt = System.currentTimeMillis() + 3600_000 // 1 hour
+            tokenExpiresAt = System.currentTimeMillis() + (expiresIn * 1000L)
             token
         }
     }
@@ -71,7 +71,7 @@ class ServiceAccountAuth(context: Context) {
         return "$signInput.${base64Url(signature)}"
     }
 
-    private fun exchangeJwtForToken(jwt: String): String {
+    private fun exchangeJwtForToken(jwt: String): Pair<String, Long> {
         val body = FormBody.Builder()
             .add("grant_type", "urn:ietf:params:oauth:grant-type:jwt-bearer")
             .add("assertion", jwt)
@@ -90,7 +90,9 @@ class ServiceAccountAuth(context: Context) {
             throw Exception("Token exchange failed: ${json.optString("error_description", responseBody)}")
         }
 
-        return json.getString("access_token")
+        val token = json.getString("access_token")
+        val expiresIn = json.optLong("expires_in", 3600L)
+        return token to expiresIn
     }
 
     private fun signRsa256(data: ByteArray, pemKey: String): ByteArray {
