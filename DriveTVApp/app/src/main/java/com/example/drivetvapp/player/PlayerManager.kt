@@ -20,14 +20,9 @@ import java.io.File
 class PlayerManager(private val context: Context, private val auth: ServiceAccountAuth) {
 
     private var player: ExoPlayer? = null
-    private var cache: SimpleCache? = null
 
     fun getPlayer(): ExoPlayer {
         if (player != null) return player!!
-
-        val cacheDir = File(context.cacheDir, "exoplayer_cache")
-        val cacheEvictor = LeastRecentlyUsedCacheEvictor(1_000_000_000L) // 1GB disk cache
-        cache = SimpleCache(cacheDir, cacheEvictor)
 
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor { chain ->
@@ -43,7 +38,7 @@ class PlayerManager(private val context: Context, private val auth: ServiceAccou
         val upstreamFactory = OkHttpDataSource.Factory(okHttpClient)
 
         val cacheDataSourceFactory: DataSource.Factory = CacheDataSource.Factory()
-            .setCache(cache!!)
+            .setCache(Shared.cache)
             .setUpstreamDataSourceFactory(upstreamFactory)
             .setFlags(CacheDataSource.FLAG_IGNORE_CACHE_ON_ERROR)
 
@@ -90,7 +85,25 @@ class PlayerManager(private val context: Context, private val auth: ServiceAccou
     fun release() {
         player?.release()
         player = null
-        cache?.release()
-        cache = null
+    }
+
+    companion object Shared {
+        @Volatile
+        private var instance: SimpleCache? = null
+
+        fun initialize(context: Context): SimpleCache {
+            return instance ?: synchronized(this) {
+                instance ?: run {
+                    val cacheDir = File(context.cacheDir, "exoplayer_cache")
+                    val cacheEvictor = LeastRecentlyUsedCacheEvictor(1_000_000_000L) // 1GB disk cache
+                    SimpleCache(cacheDir, cacheEvictor).also { instance = it }
+                }
+            }
+        }
+
+        val cache: SimpleCache
+            get() = instance ?: throw IllegalStateException(
+                "SimpleCache not initialized. Call PlayerManager.Shared.initialize(context) first."
+            )
     }
 }
