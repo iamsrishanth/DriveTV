@@ -1,6 +1,6 @@
 # Drive TV App
 
-An Android TV optimized native Kotlin application that integrates directly with Google Drive to securely stream video files using a hardware-accelerated libVLC player. Look at that D-Pad navigation support go!
+An Android TV optimized native Kotlin application that integrates directly with Google Drive to securely stream video files using a hardware-accelerated ExoPlayer (Media3) player with 1GB disk cache. Look at that D-Pad navigation support go!
 
 ## Prerequisites
 
@@ -62,6 +62,6 @@ Service accounts are essentially "bots." They **only** see what is explicitly sh
 
 ## Tech Stack
 *   **100% Kotlin Compose for TV** (`androidx.tv.material3`) targeting TV D-pads natively.
-*   **libVLC Android binding** for high-performance MP4/MKV hardware-accelerated playback on slow generic TV chips.
+*   **Media3 ExoPlayer** for high-performance MP4/MKV hardware-accelerated playback on slow generic TV chips, with 1GB LRU disk caching.
 *   **Repository Pattern / MVVM** using Kotlin Coroutines for safe UI states.
 *   **OkHttp / manual JWT generation** (No heavy dependency on the full bulky Google Java API Client).
