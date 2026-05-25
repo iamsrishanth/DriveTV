@@ -3,6 +3,9 @@ package com.example.drivetvapp.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -17,7 +20,14 @@ fun AppNavigation() {
 
     val auth = remember { ServiceAccountAuth(context) }
     val driveRepository = remember { DriveRepository(auth) }
-    val browseViewModel = remember { BrowseViewModel(driveRepository) }
+    val browseViewModel: BrowseViewModel = viewModel(
+        factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                return BrowseViewModel(driveRepository) as T
+            }
+        }
+    )
 
     NavHost(navController = navController, startDestination = "browse") {
         composable("browse") {
