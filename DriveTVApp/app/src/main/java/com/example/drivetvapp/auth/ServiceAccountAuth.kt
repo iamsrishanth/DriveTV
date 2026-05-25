@@ -15,7 +15,7 @@ import java.security.Signature
 import java.security.spec.PKCS8EncodedKeySpec
 import java.util.concurrent.TimeUnit
 
-class ServiceAccountAuth(context: Context) {
+class ServiceAccountAuth(private val context: Context) {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
@@ -29,11 +29,14 @@ class ServiceAccountAuth(context: Context) {
     private var cachedToken: String? = null
     private var tokenExpiresAt: Long = 0
 
-    private val clientEmail: String
-    private val privateKeyPem: String
-    private val tokenUri: String
+    private data class Credentials(
+        val clientEmail: String,
+        val privateKeyPem: String,
+        val tokenUri: String
+    )
 
-    init {
+    // Lazy-loaded to avoid blocking the composition thread with disk I/O
+    private val credentials: Credentials by lazy {
         val resId = context.resources.getIdentifier("credentials", "raw", context.packageName)
         if (resId == 0) {
             throw IllegalStateException(
@@ -43,9 +46,11 @@ class ServiceAccountAuth(context: Context) {
         }
         val raw = context.resources.openRawResource(resId)
         val json = JSONObject(raw.bufferedReader().use { it.readText() })
-        clientEmail = json.getString("client_email")
-        privateKeyPem = json.getString("private_key")
-        tokenUri = json.getString("token_uri")
+        Credentials(
+            clientEmail = json.getString("client_email"),
+            privateKeyPem = json.getString("private_key"),
+            tokenUri = json.getString("token_uri")
+        )
     }
 
     suspend fun getAccessToken(): String = mutex.withLock {
@@ -69,16 +74,16 @@ class ServiceAccountAuth(context: Context) {
         val header = base64Url("""{"alg":"RS256","typ":"JWT"}""".toByteArray())
 
         val claims = JSONObject().apply {
-            put("iss", clientEmail)
+            put("iss", credentials.clientEmail)
             put("scope", "https://www.googleapis.com/auth/drive.readonly")
-            put("aud", tokenUri)
+            put("aud", credentials.tokenUri)
             put("iat", now)
             put("exp", exp)
         }
         val payload = base64Url(claims.toString().toByteArray())
 
         val signInput = "$header.$payload"
-        val signature = signRsa256(signInput.toByteArray(), privateKeyPem)
+        val signature = signRsa256(signInput.toByteArray(), credentials.privateKeyPem)
 
         return "$signInput.${base64Url(signature)}"
     }
@@ -90,7 +95,7 @@ class ServiceAccountAuth(context: Context) {
             .build()
 
         val request = Request.Builder()
-            .url(tokenUri)
+            .url(credentials.tokenUri)
             .post(body)
             .build()
 
