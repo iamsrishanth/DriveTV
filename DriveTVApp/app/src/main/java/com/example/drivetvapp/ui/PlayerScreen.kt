@@ -10,13 +10,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.ExperimentalTvMaterial3Api
-import androidx.tv.material3.Text
 import com.example.drivetvapp.auth.ServiceAccountAuth
 import com.example.drivetvapp.player.PlayerManager
 import androidx.media3.ui.CaptionStyleCompat
@@ -31,8 +31,25 @@ fun PlayerScreen(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val playerManager = remember { PlayerManager(context, auth) }
     val player = remember { playerManager.getPlayer() }
+
+    // Lifecycle observer: pause on background, resume on foreground
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> player.playWhenReady = false
+                Lifecycle.Event.ON_RESUME -> player.playWhenReady = true
+                Lifecycle.Event.ON_DESTROY -> playerManager.release()
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
 
     DisposableEffect(streamUrl) {
         playerManager.playUrl(streamUrl, subtitleUrls)
@@ -74,20 +91,20 @@ fun PlayerScreen(
                             
                             if (isDpadOrEnter && !isControllerFullyVisible) {
                                 showController()
-                                return@setOnKeyListener true // Wake up UI without triggering background actions
+                                return@setOnKeyListener true
                             }
                         }
-                        false // Pass event to ExoPlayer or standard Android TV focus handler
+                        false
                     }
 
                     subtitleView?.setStyle(
                         CaptionStyleCompat(
-                            AndroidColor.WHITE, // foregroundColor
-                            AndroidColor.TRANSPARENT, // backgroundColor
-                            AndroidColor.TRANSPARENT, // windowColor
-                            CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW, // edgeType
-                            AndroidColor.BLACK, // edgeColor
-                            null // typeface
+                            AndroidColor.WHITE,
+                            AndroidColor.TRANSPARENT,
+                            AndroidColor.TRANSPARENT,
+                            CaptionStyleCompat.EDGE_TYPE_DROP_SHADOW,
+                            AndroidColor.BLACK,
+                            null
                         )
                     )
                 }
