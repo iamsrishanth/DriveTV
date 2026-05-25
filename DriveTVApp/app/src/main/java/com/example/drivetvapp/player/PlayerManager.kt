@@ -3,6 +3,8 @@ package com.example.drivetvapp.player
 import android.content.Context
 import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.cache.CacheDataSource
@@ -12,6 +14,8 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import com.example.drivetvapp.auth.ServiceAccountAuth
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import java.io.File
@@ -20,6 +24,9 @@ import java.io.File
 class PlayerManager(private val context: Context, private val auth: ServiceAccountAuth) {
 
     private var player: ExoPlayer? = null
+
+    private val _playerError = MutableStateFlow<PlaybackException?>(null)
+    val playerError: StateFlow<PlaybackException?> = _playerError
 
     fun getPlayer(): ExoPlayer {
         if (player != null) return player!!
@@ -47,6 +54,12 @@ class PlayerManager(private val context: Context, private val auth: ServiceAccou
         player = ExoPlayer.Builder(context)
             .setMediaSourceFactory(mediaSourceFactory)
             .build()
+
+        player?.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                _playerError.value = error
+            }
+        })
 
         return player!!
     }
