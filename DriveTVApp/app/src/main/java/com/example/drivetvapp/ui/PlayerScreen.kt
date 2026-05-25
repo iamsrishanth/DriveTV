@@ -17,6 +17,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.ui.PlayerView
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Text
+import com.example.drivetvapp.auth.ServiceAccountAuth
 import com.example.drivetvapp.player.PlayerManager
 import androidx.media3.ui.CaptionStyleCompat
 import android.graphics.Color as AndroidColor
@@ -26,12 +27,12 @@ import android.graphics.Color as AndroidColor
 fun PlayerScreen(
     streamUrl: String,
     subtitleUrls: List<String>,
-    accessToken: String,
+    auth: ServiceAccountAuth,
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val playerManager = remember { PlayerManager(context) }
-    val player = remember { playerManager.getPlayer(accessToken) }
+    val playerManager = remember { PlayerManager(context, auth) }
+    val player = remember { playerManager.getPlayer() }
 
     DisposableEffect(streamUrl) {
         playerManager.playUrl(streamUrl, subtitleUrls)

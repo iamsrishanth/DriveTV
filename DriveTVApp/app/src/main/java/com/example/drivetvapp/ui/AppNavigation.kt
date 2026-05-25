@@ -33,12 +33,11 @@ fun AppNavigation() {
             val fileId = backStackEntry.arguments?.getString("fileId") ?: return@composable
             val streamUrl = browseViewModel.getStreamUrl(fileId)
             val subtitleUrls = browseViewModel.getSubtitleUrls(fileId)
-            val accessToken = browseViewModel.getAccessToken()
 
             PlayerScreen(
                 streamUrl = streamUrl,
                 subtitleUrls = subtitleUrls,
-                accessToken = accessToken,
+                auth = auth,
                 onBack = { navController.popBackStack() }
             )
         }

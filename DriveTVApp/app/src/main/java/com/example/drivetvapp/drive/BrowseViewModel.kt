@@ -66,6 +66,4 @@ class BrowseViewModel(private val driveRepository: DriveRepository) : ViewModel(
             .filter { it.isSubtitle && it.nameWithoutExtension.contains(videoFile.nameWithoutExtension, ignoreCase = true) }
             .map { driveRepository.getStreamUrl(it.id) }
     }
-
-    fun getAccessToken(): String = driveRepository.getAccessToken()
 }

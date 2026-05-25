@@ -11,16 +11,18 @@ import androidx.media3.datasource.cache.SimpleCache
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import com.example.drivetvapp.auth.ServiceAccountAuth
+import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import java.io.File
 
 @OptIn(UnstableApi::class)
-class PlayerManager(private val context: Context) {
+class PlayerManager(private val context: Context, private val auth: ServiceAccountAuth) {
 
     private var player: ExoPlayer? = null
     private var cache: SimpleCache? = null
 
-    fun getPlayer(accessToken: String): ExoPlayer {
+    fun getPlayer(): ExoPlayer {
         if (player != null) return player!!
 
         val cacheDir = File(context.cacheDir, "exoplayer_cache")
@@ -30,8 +32,9 @@ class PlayerManager(private val context: Context) {
         val okHttpClient = OkHttpClient.Builder()
             .addInterceptor { chain ->
                 val original = chain.request()
+                val token = runBlocking { auth.getAccessToken() }
                 val authorized = original.newBuilder()
-                    .addHeader("Authorization", "Bearer $accessToken")
+                    .addHeader("Authorization", "Bearer $token")
                     .build()
                 chain.proceed(authorized)
             }

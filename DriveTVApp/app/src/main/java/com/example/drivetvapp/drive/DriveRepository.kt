@@ -2,7 +2,6 @@ package com.example.drivetvapp.drive
 
 import com.example.drivetvapp.auth.ServiceAccountAuth
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -81,9 +80,5 @@ class DriveRepository(private val auth: ServiceAccountAuth) {
 
     fun getStreamUrl(fileId: String): String {
         return "https://www.googleapis.com/drive/v3/files/$fileId?alt=media"
-    }
-
-    fun getAccessToken(): String = runBlocking {
-        auth.getAccessToken()
     }
 }
