@@ -58,12 +58,12 @@ class BrowseViewModel(private val driveRepository: DriveRepository) : ViewModel(
 
     fun getStreamUrl(fileId: String): String = driveRepository.getStreamUrl(fileId)
 
-    fun getSubtitleUrls(fileId: String): List<String> {
+    fun getSubtitleUrls(fileId: String): List<Pair<String, String>> {
         val currentState = _browseState.value as? BrowseState.FileList ?: return emptyList()
         val videoFile = currentState.files.find { it.id == fileId } ?: return emptyList()
         
         return currentState.files
             .filter { it.isSubtitle && it.nameWithoutExtension.contains(videoFile.nameWithoutExtension, ignoreCase = true) }
-            .map { driveRepository.getStreamUrl(it.id) }
+            .map { driveRepository.getStreamUrl(it.id) to it.name }
     }
 }

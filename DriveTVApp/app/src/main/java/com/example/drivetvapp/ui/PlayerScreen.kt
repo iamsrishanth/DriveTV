@@ -26,7 +26,7 @@ import android.graphics.Color as AndroidColor
 @Composable
 fun PlayerScreen(
     streamUrl: String,
-    subtitleUrls: List<String>,
+    subtitleUrls: List<Pair<String, String>>,
     auth: ServiceAccountAuth,
     onBack: () -> Unit
 ) {

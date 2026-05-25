@@ -51,12 +51,12 @@ class PlayerManager(private val context: Context, private val auth: ServiceAccou
         return player!!
     }
 
-    fun playUrl(url: String, subtitleUrls: List<String> = emptyList()) {
+    fun playUrl(url: String, subtitleUrls: List<Pair<String, String>> = emptyList()) {
         player?.let {
             val mediaItemBuilder = MediaItem.Builder().setUri(url)
             
-            val subtitleConfigs = subtitleUrls.mapIndexed { index, subtitleUrl ->
-                val mimeType = if (subtitleUrl.contains(".vtt", ignoreCase = true)) {
+            val subtitleConfigs = subtitleUrls.mapIndexed { index, (subtitleUrl, subtitleName) ->
+                val mimeType = if (subtitleName.endsWith(".vtt", ignoreCase = true)) {
                     androidx.media3.common.MimeTypes.TEXT_VTT
                 } else {
                     androidx.media3.common.MimeTypes.APPLICATION_SUBRIP
