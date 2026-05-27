@@ -10,6 +10,7 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.cache.CacheDataSource
 import androidx.media3.datasource.cache.LeastRecentlyUsedCacheEvictor
 import androidx.media3.datasource.cache.SimpleCache
+import androidx.media3.database.StandaloneDatabaseProvider
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -80,7 +81,7 @@ class PlayerManager(private val context: Context, private val auth: ServiceAccou
                 
                 MediaItem.SubtitleConfiguration.Builder(android.net.Uri.parse(subtitleUrl))
                     .setMimeType(mimeType)
-                    .setLanguage("en")
+                    .setLanguage(detectSubtitleLanguage(subtitleName))
                     .setSelectionFlags(selectionFlag)
                     .build()
             }
@@ -95,6 +96,31 @@ class PlayerManager(private val context: Context, private val auth: ServiceAccou
         }
     }
 
+    /**
+     * Detects the language code from a subtitle filename.
+     * e.g., "Movie.en.srt" → "en", "Movie.eng.srt" → "en", "Movie.srt" → "en" (default)
+     */
+    private fun detectSubtitleLanguage(fileName: String): String {
+        val nameWithoutExt = fileName.substringBeforeLast('.')
+        val lastDot = nameWithoutExt.lastIndexOf('.')
+        if (lastDot > 0) {
+            val suffix = nameWithoutExt.substring(lastDot + 1).lowercase()
+            // Map common 3-letter codes to 2-letter
+            val langMap = mapOf(
+                "eng" to "en", "fre" to "fr", "spa" to "es", "ger" to "de",
+                "jpn" to "ja", "kor" to "ko", "chi" to "zh", "por" to "pt",
+                "ita" to "it", "rus" to "ru", "ara" to "ar", "hin" to "hi",
+                "dut" to "nl", "swe" to "sv", "pol" to "pl", "tur" to "tr",
+                "cze" to "cs", "rum" to "ro", "hun" to "hu", "fin" to "fi",
+                "nor" to "no", "dan" to "da", "tha" to "th", "vie" to "vi"
+            )
+            if (suffix.length == 2 || suffix in langMap) {
+                return langMap[suffix] ?: suffix
+            }
+        }
+        return "en" // default
+    }
+
     fun release() {
         player?.release()
         player = null
@@ -104,12 +130,16 @@ class PlayerManager(private val context: Context, private val auth: ServiceAccou
         @Volatile
         private var instance: SimpleCache? = null
 
+        /** Maximum cache size in bytes. Default 500 MB — safe for TV boxes with limited storage. */
+        const val MAX_CACHE_BYTES = 500_000_000L
+
         fun initialize(context: Context): SimpleCache {
             return instance ?: synchronized(this) {
                 instance ?: run {
                     val cacheDir = File(context.cacheDir, "exoplayer_cache")
-                    val cacheEvictor = LeastRecentlyUsedCacheEvictor(1_000_000_000L) // 1GB disk cache
-                    SimpleCache(cacheDir, cacheEvictor).also { instance = it }
+                    val cacheEvictor = LeastRecentlyUsedCacheEvictor(MAX_CACHE_BYTES)
+                    val databaseProvider = StandaloneDatabaseProvider(context)
+                    SimpleCache(cacheDir, cacheEvictor, databaseProvider).also { instance = it }
                 }
             }
         }

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -116,9 +117,8 @@ fun PlayerScreen(
                         controllerShowTimeoutMs = 5000
                         setShowSubtitleButton(true)
 
-                        isFocusable = true
-                        isFocusableInTouchMode = true
-                        requestFocus()
+                    isFocusable = true
+                    isFocusableInTouchMode = true
 
                         setOnKeyListener { _, keyCode, event ->
                             if (event.action == KeyEvent.ACTION_DOWN) {
@@ -152,6 +152,7 @@ fun PlayerScreen(
                         )
                     }
                 },
+                update = { view -> view.requestFocus() },
                 modifier = Modifier.fillMaxSize()
             )
         }

@@ -25,7 +25,7 @@ class DriveRepository(private val auth: ServiceAccountAuth) {
     )
 
     private val subtitleMimeTypes = setOf(
-        "text/vtt", "application/x-subrip", "text/srt", "text/plain"
+        "text/vtt", "application/x-subrip", "text/srt"
     )
 
     suspend fun listFiles(folderId: String = "root"): List<DriveFile> = withContext(Dispatchers.IO) {
