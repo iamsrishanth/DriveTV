@@ -22,11 +22,14 @@ class BrowseViewModel(private val driveRepository: DriveRepository) : ViewModel(
     private val _canGoBack = MutableStateFlow(false)
     val canGoBack: StateFlow<Boolean> = _canGoBack
 
+    private var currentFolderId: String = "root"
+
     init {
         loadFiles()
     }
 
     fun loadFiles(folderId: String = "root", folderName: String = "DriveTV") {
+        currentFolderId = folderId
         _browseState.value = BrowseState.Loading
 
         viewModelScope.launch {
@@ -42,7 +45,7 @@ class BrowseViewModel(private val driveRepository: DriveRepository) : ViewModel(
     fun navigateToFolder(folderId: String, folderName: String) {
         val currentState = _browseState.value
         if (currentState is BrowseState.FileList) {
-            folderStack.add(folderId to currentState.folderName)
+            folderStack.add(currentFolderId to currentState.folderName)
             _canGoBack.value = folderStack.isNotEmpty()
         }
         loadFiles(folderId, folderName)

@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.runBlocking
 import okhttp3.OkHttpClient
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 @OptIn(UnstableApi::class)
 class PlayerManager(private val context: Context, private val auth: ServiceAccountAuth) {
@@ -33,6 +34,9 @@ class PlayerManager(private val context: Context, private val auth: ServiceAccou
         if (player != null) return player!!
 
         val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .callTimeout(60, TimeUnit.SECONDS)
             .addInterceptor { chain ->
                 val original = chain.request()
                 val token = runBlocking { auth.getAccessToken() }
